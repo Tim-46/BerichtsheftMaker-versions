@@ -1,0 +1,51 @@
+name: Re-release from private repository
+
+on:
+  repository_dispatch:
+    types: [my-event-BerichtsheftMaker]
+
+jobs:
+  download_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout current repository
+      - name: Checkout current repository
+        uses: actions/checkout@v3
+
+      # 2. Finde und downloade die .exe-Datei aus dem privaten Release
+      - name: Download release from private repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        run: |
+          # Finde die Download-URL der .exe-Datei
+          DOWNLOAD_URL=$(curl -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/Tim-46/BerichtsheftMaker/releases/latest \
+            | jq -r '.assets[] | select(.name | endswith(".exe")).browser_download_url')
+          
+          echo "Download URL: $DOWNLOAD_URL"
+
+          # Lade die .exe-Datei herunter und speichere die HTTP-Response
+          HTTP_RESPONSE=$(curl -L -H "Authorization: token $GITHUB_TOKEN" "$DOWNLOAD_URL" -w "%{http_code}" -o BerichtsheftMaker_WPF.exe)
+
+          # Zeige die HTTP-Antwort an, um sicherzustellen, dass der Download korrekt war
+          echo "HTTP response code: $HTTP_RESPONSE"
+          
+          # Zeige die Dateigröße und den Dateityp an
+          ls -lh BerichtsheftMakerUpdater.exe
+          file BerichtsheftMakerUpdater.exe
+
+      # 3. Erstelle ein neues Release im aktuellen Repository
+      - name: Create new release in current repository
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}  # Beispiel: Festlegung der Version
+          release_name: 'Re-release of the asset'
+          body: 'This is a re-release of the asset from a private repository.'
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+
